@@ -7,8 +7,9 @@ import sys
 import logging
 import json
 from datetime import datetime, timedelta
-
+from time import time
 import aiohttp
+
 
 DAYS_TO_CHECK = 2
 DAYS_TO_CHECK_HARD_LIMIT = 10
@@ -70,24 +71,28 @@ def arg_parse():
     return currencies, days_to_check
 
 async def main() -> list[dict]:
-    rate_data = []
     # process entered arguments
     currencies, days_to_check = arg_parse()
+    # generate dates strings list
+    requested_dates = []
+    for days_offset in range(days_to_check):
+        start_date = datetime.now() - timedelta(days=days_offset)
+        start_date_str = start_date.strftime("%d.%m.%Y")
+        requested_dates.append(start_date_str)
     # open session
     async with aiohttp.ClientSession() as session:
-        for days_offset in range(days_to_check):
-            start_date = datetime.now() - timedelta(days=days_offset)
-            start_date_str = start_date.strftime("%d.%m.%Y")
-            response = await request(session, url=BASE_URL, params={'date': start_date_str})
-            # filter out unneeded data
-            # NB: there is no data - response["exchangeRate"] is empty for "today" before 9:00
-            filtered_data = filter_data(response, currencies)
-            rate_data.append(filtered_data)
-    return rate_data
+        responses = [request(session, url=BASE_URL, params={'date': date}) for date in requested_dates]
+        results = await asyncio.gather(*responses)
+    # filter out unneeded data
+    # NB: there is no data - means response["exchangeRate"] is empty for "today" before 9:00
+    filtered_data = [filter_data(response, currencies) for response in results]
+    return filtered_data
         
 
 if __name__ == "__main__":
     if platform.system() == 'Windows':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    result = asyncio.run(main())
-    print(json.dumps(result, indent=4))
+    now = time()
+    results = asyncio.run(main())
+    print(json.dumps(results, indent=4))
+    print(time() - now)
