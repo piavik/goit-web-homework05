@@ -70,15 +70,19 @@ def arg_parse():
     currencies = DEFAULT_CURRENCIES + additional_currencies
     return currencies, days_to_check
 
+def get_dates(days_to_check):
+    result = []
+    for days_offset in range(days_to_check):
+        start_date = datetime.now() - timedelta(days=days_offset)
+        start_date_str = start_date.strftime("%d.%m.%Y")
+        result.append(start_date_str)
+    return result
+
 async def main() -> list[dict]:
     # process entered arguments
     currencies, days_to_check = arg_parse()
     # generate dates strings list
-    requested_dates = []
-    for days_offset in range(days_to_check):
-        start_date = datetime.now() - timedelta(days=days_offset)
-        start_date_str = start_date.strftime("%d.%m.%Y")
-        requested_dates.append(start_date_str)
+    requested_dates = get_dates(days_to_check)
     # open session
     async with aiohttp.ClientSession() as session:
         responses = [request(session, url=BASE_URL, params={'date': date}) for date in requested_dates]
